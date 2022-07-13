@@ -55,10 +55,14 @@ async def archive_guild(guild_id,channel_id,file_name):
 async def archive_channel(channel,file_name):
 	# start 
 	f = open(file_name,'a')
-	async for message in channel.history(limit=1000000):
-		if(message.author.bot == True or bots_only == False):
-			content = message.content.replace("\\","\\\\",999999).replace("\n","",999999).replace("\"","'",999999)
-			f.write('{"author": "%s", "channel": "%s", "content": "%s", "timestamp": "%s", "fictional": "%s"}\n' % (message.author.name,message.channel.name,content,message.created_at,message.author.bot))
+	try:
+		async for message in channel.history(limit=1000000):
+			if(message.author.bot == True or bots_only == False):
+					content = message.content.replace("\\","\\\\",999999).replace("\n"," ",999999).replace("\"","'",999999)
+					f.write('{"author": "%s", "channel": "%s", "content": "%s", "timestamp": "%s", "fictional": "%s"}\n' % (message.author.name,message.channel.name,content,int(message.created_at.timestamp()),message.author.bot))
+	except discord.errors.Forbidden:
+		print("Channel "+channel.name+" is locked from the bot.")
+		pass
 	f.close()
 
 f = open("key","r")
