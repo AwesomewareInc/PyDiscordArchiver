@@ -61,8 +61,8 @@ async def archive_channel(channel,file_name):
 			if message.webhook_id:
 				is_fictional = True
 			if(is_fictional == True or bots_only == False):
-					content = message.content.replace("\\","\\\\",999999).replace("\n"," ",999999).replace("\"","'",999999)
-					f.write('{"author": "%s", "channel": "%s", "content": "%s", "timestamp": "%s", "fictional": "%s"}\n' % (message.author.name,message.channel.name,content,int(message.created_at.timestamp()),is_fictional))
+					content = message.content.replace("\\","\\\\",999999).replace("\"","'",999999)
+					f.write('{"id": "%s", "author": "%s", "channel": "%s", "content": "%s", "timestamp": "%s", "fictional": "%s"}\n' % (message.id,message.author.name,message.channel.name,content,int(message.created_at.timestamp()),is_fictional))
 	except discord.errors.Forbidden:
 		print("Channel "+channel.name+" is locked from the bot.")
 		pass
