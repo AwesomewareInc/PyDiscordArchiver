@@ -64,25 +64,6 @@ async def archive_channel(client,channel,file_name):
 		pass
 	f.close()
 
-def run_async(func, *args, **kwargs):
-	try:
-		loop = asyncio.get_running_loop()
-	except RuntimeError:
-		loop = None
-	if loop is not None and loop.is_running():
-		thread = RunThread(func, args, kwargs)
-		thread.start()
-		thread.join()
-		return thread.result
-	else:
-		loop = asyncio.new_event_loop()
-		asyncio.set_event_loop(loop)
-		try:
-			loop.run_until_complete(func(*args, **kwargs))
-		except RuntimeError:
-			print("runtime error")
-		loop.close()
-
 client = discord.Client(
 	intents=discord.Intents(
 		message_content=True,
