@@ -1,6 +1,13 @@
 import discord
 
-client = discord.Client()
+client = discord.Client(
+	intents=discord.Intents(
+		message_content=True,
+		guild_messages=True,
+		guilds=True,
+	)
+)
+
 bots_only = False
 
 @client.event
