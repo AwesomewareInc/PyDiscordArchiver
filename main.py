@@ -8,9 +8,8 @@ bots_only = False					# should it filter to bots only
 check_category_name = True			# should it check the category of each channel to make sure it's in an "archives" channel
 guild_id = -1						# guild ID. -1 to prompt the user.
 channel_id = -1						# channel ID. -1 for all.
+valid_channel_id_given = False		# whether to prompt for channel ID
 
-
-valid_channel_id_given = False		
 messages = None
 time_since_last_downloaded = 0
 
@@ -50,6 +49,7 @@ def get_channels():
 async def main_bot(client):
 	global channel_id
 	global guild_id
+	global valid_channel_id_given
 
 	# ask for the guild id
 	while guild_id <= -1:
@@ -74,8 +74,7 @@ async def main_bot(client):
 			valid_channel_id_given = True
 
 	# ask what file to write to
-	#file_name = input("What file should this be saved to? .json will automatically be appended to whatever you enter:\n")
-	file_name = "ddd_roleplay"
+	file_name = input("What file should this be saved to? .json will automatically be appended to whatever you enter:\n")
 	await archive_guild(client,guild_id,channel_id,file_name+".json")
 	await client.close()
 
@@ -105,7 +104,7 @@ async def archive_channel(client,channel,file_name):
 	global download_avatars
 	global time_since_last_downloaded
 	global messages
-	
+
 	if str(channel.name) in get_channels():
 		print("skipping "+str(channel.name)+"; already archived.")
 		return
@@ -164,7 +163,7 @@ async def archive_channel(client,channel,file_name):
 		print("Channel "+channel.name+" is locked from the bot.")
 		pass
 	f = open(file_name,'w')
-	f.write(json.dumps(messages,cls=MessageEncoder))
+	f.write(json.dumps(messages,cls=MessageEncoder).replace("},","}\n").replace("[","").replace("]",""))
 	f.close()
 	print(format("parsed %d messages" % len(messages)))
 
