@@ -13,8 +13,16 @@ valid_channel_id_given = False		# whether to prompt for channel ID
 messages = None
 time_since_last_downloaded = 0
 
+class Channel:
+	def __init__(self, id: str, name: str, category_id: str):
+		self.obj_type = "channel"
+		self.id = id
+		self.name = name
+		self.category_id = category_id
+
 class Message:
 	def __init__(self, id: str, avatar: str, author: str, channel: str, content: str, timestamp: str, fictional: bool) -> None:
+		self.obj_type = "message"
 		self.id = id
 		self.avatar = avatar
 		self.author = author
@@ -31,10 +39,13 @@ class MessageEncoder(JSONEncoder):
 	
 def fucker(f):
 	if str(type(f)) == "<class 'dict'>":
-		return f["channel"]
+		if f["obj_type"] == "message":
+			return f["channel"]
 	else:
-		return f.channel
-	
+		if f.obj_type == "message":
+			return f.channel
+	return None
+
 def fuck(f):
 	if str(type(f)) == "<class 'dict'>":
 		return f["id"]
@@ -80,24 +91,32 @@ async def main_bot(client):
 
 async def archive_guild(client,guild_id,channel_id,file_name):
 	global messages
-	
-
-	f = open(file_name,'r')
 	try:
+		f = open(file_name,'r')
 		messages = json.loads(f.read())
+		f.close()
 	except Exception as ex:
 		print(ex)
 		messages = []
 		pass
-	f.close()
+	
 
 	guild = client.get_guild(guild_id)
 	if(channel_id == -1):
 		for channel in guild.channels:
 			if(channel.type == discord.ChannelType.text):
+				if check_category_name:
+					if channel.category is not None:
+						if "archives" not in channel.category.name.lower():
+							continue
+					else: 
+						continue
+				messages.append(Channel(channel.id,channel.name,channel.category.name))
 				await archive_channel(client,channel,file_name)
 	else:
-		await archive_channel(client,guild.get_channel(channel_id),file_name)
+		channel = guild.get_channel(channel_id)
+		messages.append(Channel(channel.id,channel.name,str(channel.category.name)))
+		await archive_channel(client,channel,file_name)
 
 async def archive_channel(client,channel,file_name):
 	global check_category_name
@@ -105,11 +124,10 @@ async def archive_channel(client,channel,file_name):
 	global time_since_last_downloaded
 	global messages
 
-	if str(channel.name) in get_channels():
-		print("skipping "+str(channel.name)+"; already archived.")
+	if str(channel.id) in get_channels():
+		print("skipping "+str(channel.id)+"; already archived.")
 		return
 	
-
 	if check_category_name:
 		if channel.category is not None:
 			if "archives" not in channel.category.name.lower():
@@ -153,7 +171,7 @@ async def archive_channel(client,channel,file_name):
 								time_since_last_downloaded = time.time()
 								
 					msg_id = message.id
-					channel = str(message.channel.name)
+					channel = message.channel.id
 					author = str(message.author.name.replace("\"","'"))
 					content = str(message.content.replace("\\","/",999999).replace("\"","'",999999).replace("\n","<br>",999999))
 					timestamp = str(int(message.created_at.timestamp()))
