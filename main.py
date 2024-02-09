@@ -1,4 +1,4 @@
-import discord, os, time, json
+import discord, os, time, json, re
 import urllib.request
 import pathlib
 from json import JSONEncoder
@@ -6,22 +6,30 @@ from json import JSONEncoder
 download_avatars = True				# should it download tupper avatars?
 bots_only = False					# should it filter to bots only
 check_category_name = True			# should it check the category of each channel to make sure it's in an "archives" channel
-guild_id = -1						# guild ID. -1 to prompt the user.
+guild_id = 554421097869606915					# guild ID. -1 to prompt the user.
 channel_id = -1						# channel ID. -1 for all.
-valid_channel_id_given = False		# whether to prompt for channel ID
+valid_channel_id_given = True		# whether to prompt for channel ID
+file_name = "ddd_roleplay"						# file name. empty for prompt.
 
 messages = None
 time_since_last_downloaded = 0
 
 class Channel:
-	def __init__(self, id: str, name: str, category_id: str):
+	def __init__(self, id: str, name: str, category_id: str, archived: bool):
 		self.obj_type = "channel"
 		self.id = id
 		self.name = name
 		self.category_id = category_id
+		self.archived = archived
+
+class User:
+	def __init__(self, id: str, name: str):
+		self.obj_type = "user"
+		self.id = id
+		self.name = name
 
 class Message:
-	def __init__(self, id: str, avatar: str, author: str, channel: str, content: str, timestamp: str, fictional: bool) -> None:
+	def __init__(self, id: str, avatar: str, author: str, channel: str, content: str, timestamp: str, fictional: bool, attachments: list[str]) -> None:
 		self.obj_type = "message"
 		self.id = id
 		self.avatar = avatar
@@ -30,6 +38,7 @@ class Message:
 		self.content = content
 		self.timestamp = timestamp
 		self.fictional = fictional
+		self.attachments = attachments
 	def toJSON(self):
 		return json.dumps(self, default=lambda o: o.__dict__, sort_keys=True, indent=4)
 	
@@ -61,6 +70,7 @@ async def main_bot(client):
 	global channel_id
 	global guild_id
 	global valid_channel_id_given
+	global file_name
 
 	# ask for the guild id
 	while guild_id <= -1:
@@ -85,7 +95,8 @@ async def main_bot(client):
 			valid_channel_id_given = True
 
 	# ask what file to write to
-	file_name = input("What file should this be saved to? .json will automatically be appended to whatever you enter:\n")
+	if file_name == "":
+		file_name = input("What file should this be saved to? .json will automatically be appended to whatever you enter:\n")
 	await archive_guild(client,guild_id,channel_id,file_name+".json")
 	await client.close()
 
@@ -102,20 +113,26 @@ async def archive_guild(client,guild_id,channel_id,file_name):
 	
 
 	guild = client.get_guild(guild_id)
+	for user in guild.members:
+		messages.append(User(user.id,user.name))
+		pass
 	if(channel_id == -1):
 		for channel in guild.channels:
 			if(channel.type == discord.ChannelType.text):
+				archived = True
 				if check_category_name:
 					if channel.category is not None:
-						if "archives" not in channel.category.name.lower():
-							continue
+						if "archives" in channel.category.name.lower() and "bios" not in channel.name:
+							archived = True
+						else:
+							archived = False
 					else: 
-						continue
-				messages.append(Channel(channel.id,channel.name,channel.category.name))
+						archived = False
+				messages.append(Channel(channel.id,channel.name,channel.category.name,archived))
 				await archive_channel(client,channel,file_name)
 	else:
 		channel = guild.get_channel(channel_id)
-		messages.append(Channel(channel.id,channel.name,str(channel.category.name)))
+		messages.append(Channel(channel.id,channel.name,str(channel.category.name),True))
 		await archive_channel(client,channel,file_name)
 
 async def archive_channel(client,channel,file_name):
@@ -147,6 +164,7 @@ async def archive_channel(client,channel,file_name):
 			if(is_fictional == True or bots_only == False):
 					avatar = ""
 					avatar_url = ""
+					attachments = []
 					if download_avatars and is_fictional:
 						if message.author.avatar is not None:
 							avatar_url = message.author.avatar.url
@@ -169,19 +187,66 @@ async def archive_channel(client,channel,file_name):
 								f3.write(f2.read())
 								f3.close()
 								time_since_last_downloaded = time.time()
-								
+						for attachment in message.attachments:
+							attachment_url = attachment.url
+							attachment = folder_name+"/"+str(message.id)+"-"+attachment.filename
+							attachments.append(attachment)
+							if not os.path.exists(attachment):
+								while time_since_last_downloaded + 3 >= time.time():
+									pass
+								req = urllib.request.Request(
+									attachment_url, 
+									data=None, 
+									headers={
+										'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
+									}
+								)
+
+								f2 = urllib.request.urlopen(req)
+								f3 = open(attachment,"xb")
+								f3.write(f2.read())
+								f3.close()
+								time_since_last_downloaded = time.time()
+								print("downloaded "+attachment)
+						links = re.findall('((http)(.*?)(discord)(.*?)(/attachments/)(.*?)/(.*?)/(.*))([a-z0-9])', message.content)
+						for link in links:
+							attachment_url = link[0]
+							attachment = folder_name+"/"+str(message.id)+"-"+link[len(link)-2]+link[len(link)-1]
+							try:
+								print(link, "\nmatched",attachment)
+								attachments.append(attachment)
+								if not os.path.exists(attachment):
+									while time_since_last_downloaded + 3 >= time.time():
+										pass
+									req = urllib.request.Request(
+										attachment_url, 
+										data=None, 
+										headers={
+											'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
+										}
+									)
+
+									f2 = urllib.request.urlopen(req)
+									f3 = open(attachment,"xb")
+									f3.write(f2.read())
+									f3.close()
+									time_since_last_downloaded = time.time()
+									print("downloaded "+attachment)
+							except Exception as ex:
+								print("could not download",attachment+":",ex)
 					msg_id = message.id
 					channel = message.channel.id
-					author = str(message.author.name.replace("\"","'"))
-					content = str(message.content.replace("\\","/",999999).replace("\"","'",999999).replace("\n","<br>",999999))
+					author = message.author.name.replace("\"","'")
+					content = str(message.content.replace("\\","/").replace("\"","'").replace("\n","\\n"))
 					timestamp = str(int(message.created_at.timestamp()))
 
-					messages.append(Message(msg_id,avatar,author,channel,content,timestamp,is_fictional))
+					messages.append(Message(msg_id,avatar,author,channel,content,timestamp,is_fictional,attachments))
 	except discord.errors.Forbidden:
 		print("Channel "+channel.name+" is locked from the bot.")
 		pass
 	f = open(file_name,'w')
-	f.write(json.dumps(messages,cls=MessageEncoder).replace("},","}\n").replace("[","").replace("]",""))
+	fuck = json.dumps(messages,cls=MessageEncoder).replace("},","}\n")
+	f.write(fuck[0:len(fuck)-1])
 	f.close()
 	print(format("parsed %d messages" % len(messages)))
 
@@ -190,6 +255,7 @@ client = discord.Client(
 		message_content=True,
 		guild_messages=True,
 		guilds=True,
+		members=True,
 	)
 )
 
